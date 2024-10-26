@@ -35,6 +35,8 @@ h1 {
   line-height: 1.1;
 }
 
+
+
 #app {
   max-width: 1280px;
   margin: 0 auto;
@@ -92,4 +94,10 @@ button:focus-visible {
   button {
     background-color: #f9f9f9;
   }
+}
+
+canvas {
+  border: 2px solid black; 
+  border-radius: 30px;
+  filter: drop-shadow(30px 10px 4px #4444dd);
 }
