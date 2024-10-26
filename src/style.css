@@ -99,5 +99,5 @@ button:focus-visible {
 canvas {
   border: 2px solid black; 
   border-radius: 30px;
-  filter: drop-shadow(30px 10px 4px #4444dd);
+  filter: drop-shadow(30px 10px 4px hsl(240, 28%, 73%));
 }
