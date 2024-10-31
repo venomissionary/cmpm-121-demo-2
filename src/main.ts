@@ -6,8 +6,8 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 document.title = APP_NAME;
 
 let checkDrawing: boolean = false;
-let lines: { x: number; y: number }[][] = [];
-let redo: { x: number; y: number }[][] = [];
+let lines: markerCommand[] = [];
+let redo: markerCommand[] = [];
 
 
 const title = document.createElement("h1");
@@ -26,6 +26,34 @@ if (ctx) {
     ctx.fillRect(0, 0, canvas.width, canvas.width);
 }
 
+//new drawing command class for line
+class markerCommand {
+    private point: { x: number; y: number }[] = [];
+
+    constructor(start: { x: number; y: number }) {
+        this.point.push(start);
+    }
+
+    drag(point_2: { x: number; y: number }) {
+        this.point.push(point_2);
+    }
+
+    display(ctx: CanvasRenderingContext2D) {
+        if (this.point.length === 0) return;
+        ctx.strokeStyle = "black";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+
+        ctx.moveTo(this.point[0].x, this.point[0].y);
+        for (let i = 1; i < this.point.length; i++) {
+            ctx.lineTo(this.point[i].x, this.point[i].y);
+        }
+
+        ctx.stroke();
+
+    }
+}
+
 //clears the canvas and saves drawn lines
 function blankSlate() {
     if (ctx) {
@@ -33,29 +61,21 @@ function blankSlate() {
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        ctx.strokeStyle = "black";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        for (const line of lines) {
-            for (let i = 0; i < line.length; i++) {
-                const endPoint = line[i];
-                if (i === 0) {
-                    ctx.moveTo(endPoint.x, endPoint.y);
-                } else {
-                    ctx.lineTo(endPoint.x, endPoint.y);
-                }
-            }
-        }
-        ctx?.stroke()
+        lines.forEach(lines => lines.display(ctx));
     }
 }
+
 
 canvas.addEventListener("drawing-changed", blankSlate);
 
 //Control drawing with the mouse
-canvas.addEventListener("mousedown", () => {
+canvas.addEventListener("mousedown", (event) => {
     checkDrawing = true;
-    lines.push([]);
+    const board = canvas.getBoundingClientRect();
+    const x = event.clientX - board.left;
+    const y = event.clientY - board.top;
+    const lineRefresh = new markerCommand({ x, y });
+    lines.push(lineRefresh);
     [redo = []];
 });
 
@@ -68,7 +88,8 @@ canvas.addEventListener("mousemove", (event) => {
         const x = event.clientX - board.left;
         const y = event.clientY - board.top;
 
-        lines[lines.length - 1].push({ x, y });
+        const saveLine = lines[lines.length - 1];
+        saveLine.drag({ x, y });
         canvas.dispatchEvent(new Event("drawing-changed"));
     }
 
@@ -87,7 +108,7 @@ clearButton.addEventListener("click", () => {
 //click button to undo a line
 const undoButton = document.createElement("button");
 undoButton.textContent = "Undo";
-undoButton.style.marginLeft =  "10%";
+undoButton.style.marginLeft = "10%";
 undoButton.addEventListener("click", () => {
     if (lines.length > 0) {
         const traces = lines.pop();
