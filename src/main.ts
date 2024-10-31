@@ -1,35 +1,37 @@
 import "./style.css";
 
-const APP_NAME = "Steven's game";
+const APP_NAME = "Interactive Whiteboard";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 document.title = APP_NAME;
 
 let checkDrawing: boolean = false;
 let lines: { x: number; y: number }[][] = [];
+let redo: { x: number; y: number }[][] = [];
+
 
 const title = document.createElement("h1");
 title.textContent = APP_NAME;
 title.style.textAlign = "center";
-title.style.marginTop = "20px";  
+title.style.marginRight = "385px";
 
 const canvas = document.createElement("canvas");
-canvas.height = 256; 
-canvas.width = 256;
+canvas.height = 500;
+canvas.width = 1000;
 
 const ctx = canvas.getContext("2d");
 
 if (ctx) {
     ctx.fillStyle = "white";
-    ctx.fillRect(0, 0, 256, 256); 
-} 
+    ctx.fillRect(0, 0, canvas.width, canvas.width);
+}
 
 //clears the canvas and saves drawn lines
 function blankSlate() {
     if (ctx) {
-        ctx.clearRect(0,0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = "white";
-        ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         ctx.strokeStyle = "black";
         ctx.lineWidth = 2;
@@ -54,7 +56,7 @@ canvas.addEventListener("drawing-changed", blankSlate);
 canvas.addEventListener("mousedown", () => {
     checkDrawing = true;
     lines.push([]);
-
+    [redo = []];
 });
 
 canvas.addEventListener("mouseup", () => (checkDrawing = false));
@@ -65,8 +67,8 @@ canvas.addEventListener("mousemove", (event) => {
         const board = canvas.getBoundingClientRect();
         const x = event.clientX - board.left;
         const y = event.clientY - board.top;
-        
-        lines[lines.length - 1].push({x, y});
+
+        lines[lines.length - 1].push({ x, y });
         canvas.dispatchEvent(new Event("drawing-changed"));
     }
 
@@ -74,15 +76,40 @@ canvas.addEventListener("mousemove", (event) => {
 
 //click button to refresh the canvas
 const clearButton = document.createElement("button");
-  clearButton.id = "myButton"; 
-  clearButton.textContent = "clear"; 
-  clearButton.style.marginLeft = "50px";
-  
-  clearButton.addEventListener("click", () => {
-   lines = [];
-   blankSlate();
+clearButton.textContent = "clear";
+clearButton.style.marginLeft = "-60%";
+clearButton.addEventListener("click", () => {
+    lines = [];
+    [redo = []];
+    blankSlate();
 });
 
+//click button to undo a line
+const undoButton = document.createElement("button");
+undoButton.textContent = "Undo";
+undoButton.style.marginLeft =  "10%";
+undoButton.addEventListener("click", () => {
+    if (lines.length > 0) {
+        const traces = lines.pop();
+        if (traces) redo.push(traces);
+        canvas.dispatchEvent(new Event("drawing-changed"));
+    }
+});
+
+//click button to redo last line
+const redoButton = document.createElement("button");
+redoButton.textContent = "Redo";
+redoButton.style.marginLeft = "2%";
+redoButton.addEventListener("click", () => {
+    if (redo.length > 0) {
+        const prev = redo.pop();
+        if (prev) lines.push(prev);
+        canvas.dispatchEvent(new Event("drawing-changed"));
+    }
+});
+
+app.appendChild(clearButton);
+app.appendChild(undoButton);
+app.appendChild(redoButton);
 app.appendChild(title);
 app.appendChild(canvas);
-app.append(clearButton);
