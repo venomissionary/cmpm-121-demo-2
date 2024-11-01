@@ -6,10 +6,12 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 document.title = APP_NAME;
 
 let checkDrawing: boolean = false;
-let lines: markerCommand[] = [];
-let redo: markerCommand[] = [];
-let CurrentLinestrength: number = 2;
+let lines: (markerCommand |stickerpreview)[] = [];
+let redo: (markerCommand |stickerpreview)[] = [];
+let clearedMarks: (markerCommand | stickerpreview)[] = [];
+let CurrentLinestrength: number = 3;
 let tool: toolPreview | null = null;
+let selectedSticker: string | null = null;
 
 
 const title = document.createElement("h1");
@@ -58,6 +60,24 @@ class markerCommand {
     }
 }
 
+//previews and creates the stickers on the canvas
+class stickerpreview {
+    private x: number;
+    private y: number;
+    private sticker: string;
+
+    constructor(x: number, y: number, sticker: string) {
+        this.x = x;
+        this.y = y;
+        this.sticker = sticker;
+    }
+
+    display(ctx: CanvasRenderingContext2D) {
+        ctx.font = "40px serif";
+        ctx.fillText(this.sticker, this.x, this.y);
+    }
+}
+
 //previews what tool you are using on the whiteboard
 class toolPreview {
     private x: number;
@@ -79,6 +99,16 @@ class toolPreview {
         ctx.clearRect(0,0, canvas.width, canvas.height);
         blankSlate();
 
+        if (selectedSticker) {
+            ctx.font = "40px serif";
+            ctx.fillText(selectedSticker, this.x, this.y);
+        } else {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.Linestrength / 2, 0, Math.PI * 2);
+            ctx.fillStyle = "rgba(0,0,0,0,5)";
+            ctx.fill();
+        }
+
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.Linestrength / 2, 0, Math.PI * 2);
         ctx.fillStyle = "rgba(0,0,0, 0.5)";
@@ -97,19 +127,24 @@ function blankSlate() {
     }
 }
 
-
 canvas.addEventListener("drawing-changed", blankSlate);
 
 //Control drawing with the mouse
 canvas.addEventListener("mousedown", (event) => {
-    checkDrawing = true;
     const board = canvas.getBoundingClientRect();
     const x = event.clientX - board.left;
     const y = event.clientY - board.top;
-    const lineRefresh = new markerCommand({ x, y }, CurrentLinestrength);
-    lines.push(lineRefresh);
-    [redo = []];
-    tool = null;
+    if (selectedSticker) {
+        const sticker = new stickerpreview(x, y, selectedSticker);
+        lines.push(sticker);
+        selectedSticker = null;
+    } else {
+         checkDrawing = true;
+         const lineRefresh = new markerCommand({ x, y }, CurrentLinestrength);
+          lines.push(lineRefresh);
+          [redo = []];
+        }
+        tool = null;
 });
 
 canvas.addEventListener("mouseup", () => {
@@ -126,7 +161,9 @@ canvas.addEventListener("mousemove", (event) => {
 
     if (checkDrawing && ctx) {
         const saveLine = lines[lines.length - 1];
-        saveLine.drag({ x, y });
+        if (saveLine instanceof markerCommand) {
+            saveLine.drag({ x, y });
+        }
         canvas.dispatchEvent(new Event("drawing-changed"));
     } else if (!checkDrawing) {
         if (!tool) {
@@ -140,11 +177,26 @@ canvas.addEventListener("mousemove", (event) => {
     }
 });
 
+//buttons for sticker selection
+const stickerLabels: HTMLButtonElement[] = [];
+const stickers = ["👽", "🌟", "🎶"];
+stickers.forEach(sticker => {
+    const stickerButton = document.createElement("button");
+    stickerButton.textContent = sticker;
+    stickerButton.addEventListener("click", () => {
+        selectedSticker = sticker;
+        selectionTool(stickerButton);
+    });
+    stickerLabels.push(stickerButton);
+    app.appendChild(stickerButton);
+});
+
 //button for choosing a thinner line
 const thinButton = document.createElement("button");
 thinButton.textContent = "Thin";
+thinButton.style.marginLeft = "-50%";
 thinButton.addEventListener("click", () => {
-    CurrentLinestrength = 2;
+    CurrentLinestrength = 3;
     selectionTool(thinButton);
 });
 
@@ -152,11 +204,11 @@ thinButton.addEventListener("click", () => {
 const thickButton = document.createElement("button");
 thickButton.textContent = "Thick";
 thickButton.addEventListener("click", () => {
-    CurrentLinestrength = 5;
+    CurrentLinestrength = 7;
     selectionTool(thickButton);
 });
 
-//identifies which line option the user is using. 
+//identifies which tools the user is using. 
 function selectionTool(selectedButton: HTMLButtonElement) {
     [thinButton, thickButton].forEach(button => button.classList.remove("selectedTool"));
     selectedButton.classList.add("selectedTool");
@@ -165,17 +217,18 @@ function selectionTool(selectedButton: HTMLButtonElement) {
 //click button to refresh the canvas
 const clearButton = document.createElement("button");
 clearButton.textContent = "clear";
-clearButton.style.marginLeft = "-60%";
+clearButton.style.marginLeft = "-50%";
 clearButton.addEventListener("click", () => {
+    clearedMarks = [...lines]
     lines = [];
     [redo = []];
     blankSlate();
 });
 
-//click button to undo a line
+//click button to undo a line and sticker
 const undoButton = document.createElement("button");
 undoButton.textContent = "Undo";
-undoButton.style.marginLeft = "10%";
+undoButton.style.marginLeft = "1%";
 undoButton.addEventListener("click", () => {
     if (lines.length > 0) {
         const traces = lines.pop();
@@ -187,11 +240,15 @@ undoButton.addEventListener("click", () => {
 //click button to redo last line
 const redoButton = document.createElement("button");
 redoButton.textContent = "Redo";
-redoButton.style.marginLeft = "2%";
+redoButton.style.marginLeft = "0%";
 redoButton.addEventListener("click", () => {
     if (redo.length > 0) {
         const prev = redo.pop();
         if (prev) lines.push(prev);
+        canvas.dispatchEvent(new Event("drawing-changed"));
+    } else if (clearedMarks.length > 0) {
+        lines = [...clearedMarks];
+        clearedMarks = [];
         canvas.dispatchEvent(new Event("drawing-changed"));
     }
 });
