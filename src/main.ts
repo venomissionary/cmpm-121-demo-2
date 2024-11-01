@@ -9,6 +9,7 @@ let checkDrawing: boolean = false;
 let lines: markerCommand[] = [];
 let redo: markerCommand[] = [];
 let CurrentLinestrength: number = 2;
+let tool: toolPreview | null = null;
 
 
 const title = document.createElement("h1");
@@ -57,6 +58,34 @@ class markerCommand {
     }
 }
 
+//previews what tool you are using on the whiteboard
+class toolPreview {
+    private x: number;
+    private y: number;
+    private Linestrength: number;
+
+    constructor(x: number, y: number, Linestrength: number) {
+        this.x = x;
+        this.y = y;
+        this.Linestrength = Linestrength;
+    }
+
+    positionUpdate(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+    }
+
+    draw(ctx: CanvasRenderingContext2D) {
+        ctx.clearRect(0,0, canvas.width, canvas.height);
+        blankSlate();
+
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.Linestrength / 2, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(0,0,0, 0.5)";
+        ctx.fill();
+    }
+}
+
 //clears the canvas and saves drawn lines
 function blankSlate() {
     if (ctx) {
@@ -80,22 +109,35 @@ canvas.addEventListener("mousedown", (event) => {
     const lineRefresh = new markerCommand({ x, y }, CurrentLinestrength);
     lines.push(lineRefresh);
     [redo = []];
+    tool = null;
 });
 
-canvas.addEventListener("mouseup", () => (checkDrawing = false));
+canvas.addEventListener("mouseup", () => {
+    checkDrawing = false;
+    tool = null;
+    canvas.dispatchEvent(new Event("drawing-changed"));
+});
 
-//tracks each points from drawn lines through mouse movement
+//tracks each points from drawn lines through mouse movement 
 canvas.addEventListener("mousemove", (event) => {
-    if (checkDrawing && ctx) {
-        const board = canvas.getBoundingClientRect();
-        const x = event.clientX - board.left;
-        const y = event.clientY - board.top;
+    const board = canvas.getBoundingClientRect();
+    const x = event.clientX - board.left;
+    const y = event.clientY - board.top;
 
+    if (checkDrawing && ctx) {
         const saveLine = lines[lines.length - 1];
         saveLine.drag({ x, y });
         canvas.dispatchEvent(new Event("drawing-changed"));
+    } else if (!checkDrawing) {
+        if (!tool) {
+            tool = new toolPreview(x, y, CurrentLinestrength);
+        } else {
+            tool.positionUpdate(x, y);
+        }
+        if (ctx && toolPreview) {
+            tool.draw(ctx);
+        }
     }
-
 });
 
 //button for choosing a thinner line
@@ -117,7 +159,7 @@ thickButton.addEventListener("click", () => {
 //identifies which line option the user is using. 
 function selectionTool(selectedButton: HTMLButtonElement) {
     [thinButton, thickButton].forEach(button => button.classList.remove("selectedTool"));
-    selectedButton.classList.add("selectionTool");
+    selectedButton.classList.add("selectedTool");
 }
 
 //click button to refresh the canvas
