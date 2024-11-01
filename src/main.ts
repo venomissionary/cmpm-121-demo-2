@@ -8,6 +8,7 @@ document.title = APP_NAME;
 let checkDrawing: boolean = false;
 let lines: markerCommand[] = [];
 let redo: markerCommand[] = [];
+let CurrentLinestrength: number = 2;
 
 
 const title = document.createElement("h1");
@@ -29,19 +30,21 @@ if (ctx) {
 //new drawing command class for line
 class markerCommand {
     private point: { x: number; y: number }[] = [];
+    private Linestrength: number;
 
-    constructor(start: { x: number; y: number }) {
+    constructor(start: { x: number; y: number }, Linestrength: number) {
         this.point.push(start);
+        this.Linestrength = Linestrength;
     }
 
-    drag(point_2: { x: number; y: number }) {
-        this.point.push(point_2);
+    drag(Pointping: { x: number; y: number }) {
+        this.point.push(Pointping);
     }
 
     display(ctx: CanvasRenderingContext2D) {
         if (this.point.length === 0) return;
         ctx.strokeStyle = "black";
-        ctx.lineWidth = 2;
+        ctx.lineWidth = this.Linestrength;
         ctx.beginPath();
 
         ctx.moveTo(this.point[0].x, this.point[0].y);
@@ -74,7 +77,7 @@ canvas.addEventListener("mousedown", (event) => {
     const board = canvas.getBoundingClientRect();
     const x = event.clientX - board.left;
     const y = event.clientY - board.top;
-    const lineRefresh = new markerCommand({ x, y });
+    const lineRefresh = new markerCommand({ x, y }, CurrentLinestrength);
     lines.push(lineRefresh);
     [redo = []];
 });
@@ -94,6 +97,28 @@ canvas.addEventListener("mousemove", (event) => {
     }
 
 });
+
+//button for choosing a thinner line
+const thinButton = document.createElement("button");
+thinButton.textContent = "Thin";
+thinButton.addEventListener("click", () => {
+    CurrentLinestrength = 2;
+    selectionTool(thinButton);
+});
+
+//button for choosing a thicker line
+const thickButton = document.createElement("button");
+thickButton.textContent = "Thick";
+thickButton.addEventListener("click", () => {
+    CurrentLinestrength = 5;
+    selectionTool(thickButton);
+});
+
+//identifies which line option the user is using. 
+function selectionTool(selectedButton: HTMLButtonElement) {
+    [thinButton, thickButton].forEach(button => button.classList.remove("selectedTool"));
+    selectedButton.classList.add("selectionTool");
+}
 
 //click button to refresh the canvas
 const clearButton = document.createElement("button");
@@ -129,6 +154,8 @@ redoButton.addEventListener("click", () => {
     }
 });
 
+app.appendChild(thinButton);
+app.appendChild(thickButton);
 app.appendChild(clearButton);
 app.appendChild(undoButton);
 app.appendChild(redoButton);
