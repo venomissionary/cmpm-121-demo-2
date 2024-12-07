@@ -1,18 +1,21 @@
 import "./style.css";
-
 const APP_NAME = "Interactive Whiteboard";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 
 document.title = APP_NAME;
 
 let checkDrawing: boolean = false;
-let lines: (markerCommand |stickerpreview)[] = [];
-let redo: (markerCommand |stickerpreview)[] = [];
+let lines: (markerCommand | stickerpreview)[] = [];
+let redo: (markerCommand | stickerpreview)[] = [];
 let clearedMarks: (markerCommand | stickerpreview)[] = [];
 let CurrentLinestrength: number = 3;
 let tool: toolPreview | null = null;
 let selectedSticker: string | null = null;
+let thick: number = 7;
+let size: number = 40;
+let rotation: number = 0;
 
+const stickers: string[] = ["👽", "🌟", "🎶"];
 
 const title = document.createElement("h1");
 title.textContent = APP_NAME;
@@ -20,14 +23,86 @@ title.style.textAlign = "center";
 title.style.marginRight = "385px";
 
 const canvas = document.createElement("canvas");
-canvas.height = 500;
-canvas.width = 1000;
+canvas.height = 1024;
+canvas.width = 1024;
 
 const ctx = canvas.getContext("2d");
 
 if (ctx) {
     ctx.fillStyle = "white";
     ctx.fillRect(0, 0, canvas.width, canvas.width);
+}
+
+//sticker containers
+const Stickercontainer = document.createElement("div");
+Stickercontainer.style.display = "flex";
+Stickercontainer.style.justifyContent = "left";
+Stickercontainer.style.gap = "15px";
+Stickercontainer.style.marginLeft = "65px";
+
+const Exportbutton = document.createElement("button");
+Exportbutton.textContent = "Export image";
+Exportbutton.style.display = "flex";
+Exportbutton.style.justifyContent = "center";
+Exportbutton.style.marginBottom = "-30px";
+Exportbutton.style.marginLeft = "15px";
+Exportbutton.addEventListener("click", imageExport);
+
+//sticker buttons
+const Customstickerbutton = document.createElement("button");
+Customstickerbutton.textContent = "Custom sticker";
+Customstickerbutton.style.marginLeft = "-50px";
+Customstickerbutton.style.marginBottom = "10px"; 
+
+Customstickerbutton.style.padding = "15px";
+Customstickerbutton.addEventListener("click", Customsticker);
+Stickercontainer.appendChild(Customstickerbutton);
+
+//generates sticker buttons
+function NewStickerbuttons() {
+    stickerLabels.forEach((button) => button.remove());
+
+    stickers.forEach((sticker) => {
+        const stickerButton = document.createElement("button");
+        stickerButton.textContent = sticker;
+        stickerButton.addEventListener("click", () => {
+            selectedSticker = sticker;
+        });
+
+        stickerLabels.push(stickerButton);
+        Stickercontainer.appendChild(stickerButton);
+    });
+}
+
+//adds to create new custom stickers by player
+function Customsticker() {
+    const text = prompt("Enter a custom emoji for your sticker:");
+    if (text && text.trim()) {
+        stickers.push(text.trim());
+        NewStickerbuttons();
+    } else {
+        alert("No characters allowed! try again");
+    }
+}
+//creates an export of the current canvas is downloaded as an image.
+function imageExport() {
+    const resolution = document.createElement("canvas");
+    resolution.width = canvas.width;
+    resolution.height = canvas.height;
+    const resNew = resolution.getContext("2d")!;
+
+    resNew.scale(
+        resolution.width / canvas.width,
+        resolution.height / canvas.height
+    );
+    resNew.fillStyle = "#FFFFFF";
+    resNew.fillRect(0, 0, resolution.width, resolution.height);
+    lines.forEach((command) => command.display(resNew));
+
+    const anchor = document.createElement("a");
+    anchor.href = resolution.toDataURL("image/png");
+    anchor.download = "sketchpad.png";
+    anchor.click();
 }
 
 //new drawing command class for line
@@ -56,7 +131,6 @@ class markerCommand {
         }
 
         ctx.stroke();
-
     }
 }
 
@@ -65,16 +139,24 @@ class stickerpreview {
     private x: number;
     private y: number;
     private sticker: string;
+    private size: number;
+    private rotation: number;
 
-    constructor(x: number, y: number, sticker: string) {
+    constructor(x: number, y: number, sticker: string, size: number, rotation: number) {
         this.x = x;
         this.y = y;
         this.sticker = sticker;
+        this.size = size;
+        this.rotation = rotation;
     }
 
     display(ctx: CanvasRenderingContext2D) {
-        ctx.font = "40px serif";
-        ctx.fillText(this.sticker, this.x, this.y);
+        ctx.save();
+        ctx.translate(this.x, this.y); 
+        ctx.rotate((this.rotation * Math.PI) / 180); 
+        ctx.font = `${this.size}px serif`;
+        ctx.fillText(this.sticker, 0, 0); 
+        ctx.restore();
     }
 }
 
@@ -96,12 +178,16 @@ class toolPreview {
     }
 
     draw(ctx: CanvasRenderingContext2D) {
-        ctx.clearRect(0,0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         blankSlate();
 
         if (selectedSticker) {
-            ctx.font = "40px serif";
-            ctx.fillText(selectedSticker, this.x, this.y);
+            ctx.save();
+            ctx.translate(this.x, this.y); 
+            ctx.rotate((rotation * Math.PI) / 180); 
+            ctx.font = `${size}px serif`;
+            ctx.fillText(selectedSticker, 0, 0); 
+            ctx.restore();
         } else {
             ctx.beginPath();
             ctx.arc(this.x, this.y, this.Linestrength / 2, 0, Math.PI * 2);
@@ -116,6 +202,7 @@ class toolPreview {
     }
 }
 
+
 //clears the canvas and saves drawn lines
 function blankSlate() {
     if (ctx) {
@@ -123,28 +210,29 @@ function blankSlate() {
         ctx.fillStyle = "white";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        lines.forEach(lines => lines.display(ctx));
+        lines.forEach((lines) => lines.display(ctx));
     }
 }
 
 canvas.addEventListener("drawing-changed", blankSlate);
 
-//Control drawing with the mouse
+//Control drawing with the mouse with applied thickness, eomoji size and rotation
 canvas.addEventListener("mousedown", (event) => {
     const board = canvas.getBoundingClientRect();
     const x = event.clientX - board.left;
     const y = event.clientY - board.top;
+
     if (selectedSticker) {
-        const sticker = new stickerpreview(x, y, selectedSticker);
+        const sticker = new stickerpreview(x, y, selectedSticker, size, rotation);
         lines.push(sticker);
         selectedSticker = null;
     } else {
-         checkDrawing = true;
-         const lineRefresh = new markerCommand({ x, y }, CurrentLinestrength);
-          lines.push(lineRefresh);
-          [redo = []];
-        }
-        tool = null;
+        checkDrawing = true;
+        const lineRefresh = new markerCommand({ x, y }, thick);
+        lines.push(lineRefresh);
+        [(redo = [])];
+    }
+    tool = null;
 });
 
 canvas.addEventListener("mouseup", () => {
@@ -153,7 +241,7 @@ canvas.addEventListener("mouseup", () => {
     canvas.dispatchEvent(new Event("drawing-changed"));
 });
 
-//tracks each points from drawn lines through mouse movement 
+//tracks each points from drawn lines through mouse movement
 canvas.addEventListener("mousemove", (event) => {
     const board = canvas.getBoundingClientRect();
     const x = event.clientX - board.left;
@@ -177,51 +265,54 @@ canvas.addEventListener("mousemove", (event) => {
     }
 });
 
-//buttons for sticker selection
-const stickerLabels: HTMLButtonElement[] = [];
-const stickers = ["👽", "🌟", "🎶"];
-stickers.forEach(sticker => {
-    const stickerButton = document.createElement("button");
-    stickerButton.textContent = sticker;
-    stickerButton.addEventListener("click", () => {
-        selectedSticker = sticker;
-        selectionTool(stickerButton);
+//function to help organize and place sliders for adjusting values for pen thickness, emoji size and rotation
+function sliderAdjustment(labels: string, val: number, min: number, max: number, step: number, willupdate: (val: number) => void): HTMLDivElement {
+    
+    const sliderContainer = document.createElement("div");
+    sliderContainer.style.display = "flex";
+    sliderContainer.style.flexDirection = "column";
+    sliderContainer.style.alignItems = "center";
+    sliderContainer.style.marginTop = "30px"; 
+    sliderContainer.style.marginBottom = "-30px"; 
+
+    const label = document.createElement("span")
+    label.textContent = `${labels}: ${val}`;
+
+    const slider = document.createElement("input");
+    slider.type = "range";
+    slider.min = min.toString();
+    slider.max = max.toString();
+    slider.step = step.toString();
+    slider.value = val.toString();
+    slider.style.marginLeft = "10px";
+    slider.addEventListener("input", () => {
+
+        const newval = parseInt(slider.value, 10);
+        label.textContent = `${labels}: ${newval}`;
+        willupdate(newval);
     });
-    stickerLabels.push(stickerButton);
-    app.appendChild(stickerButton);
-});
 
-//button for choosing a thinner line
-const thinButton = document.createElement("button");
-thinButton.textContent = "Thin";
-thinButton.style.marginLeft = "-50%";
-thinButton.addEventListener("click", () => {
-    CurrentLinestrength = 3;
-    selectionTool(thinButton);
-});
+    sliderContainer.appendChild(label);
+    sliderContainer.appendChild(slider);
 
-//button for choosing a thicker line
-const thickButton = document.createElement("button");
-thickButton.textContent = "Thick";
-thickButton.addEventListener("click", () => {
-    CurrentLinestrength = 7;
-    selectionTool(thickButton);
-});
-
-//identifies which tools the user is using. 
-function selectionTool(selectedButton: HTMLButtonElement) {
-    [thinButton, thickButton].forEach(button => button.classList.remove("selectedTool"));
-    selectedButton.classList.add("selectedTool");
+    return sliderContainer;
 }
+
+const stickerLabels: HTMLButtonElement[] = [];
+
+//invdividual value sliders for tools that changes based on the users choice
+const thickLine = sliderAdjustment("Pen Thickness", thick, 1, 20, 1, (value) => { thick = value; });
+const emojiSize = sliderAdjustment("Emoji Size", size, 10, 100, 5, (value) => { size = value; });
+const stickerRotation = sliderAdjustment("Sticker Rotation", rotation, -180, 180, 1, (value) => {rotation = value;});
 
 //click button to refresh the canvas
 const clearButton = document.createElement("button");
 clearButton.textContent = "clear";
-clearButton.style.marginLeft = "-50%";
+clearButton.style.marginLeft = "-70%";
 clearButton.addEventListener("click", () => {
-    clearedMarks = [...lines]
+    clearedMarks = [...lines];
     lines = [];
-    [redo = []];
+    [(redo = [])];
     blankSlate();
 });
 
@@ -240,7 +331,7 @@ undoButton.addEventListener("click", () => {
 //click button to redo last line
 const redoButton = document.createElement("button");
 redoButton.textContent = "Redo";
-redoButton.style.marginLeft = "0%";
+redoButton.style.marginLeft = "1%";
 redoButton.addEventListener("click", () => {
     if (redo.length > 0) {
         const prev = redo.pop();
@@ -253,8 +344,12 @@ redoButton.addEventListener("click", () => {
     }
 });
 
-app.appendChild(thinButton);
-app.appendChild(thickButton);
+NewStickerbuttons();
+app.appendChild(Stickercontainer);
+app.appendChild(Exportbutton);
+app.appendChild(thickLine);
+app.appendChild(emojiSize);
+app.appendChild(stickerRotation);
 app.appendChild(clearButton);
 app.appendChild(undoButton);
 app.appendChild(redoButton);
